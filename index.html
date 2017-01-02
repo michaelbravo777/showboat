@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html>
+
+  <head>
+
+    <meta charset="UTF-8">
+
+    <title>Showboat MP3 Player</title>
+
+    <link rel="stylesheet" type="text/css" href="assets/css/style.css">
+
+    <script src="assets/js/three.min.js"></script>
+    <script src="assets/js/Projector.js"></script>
+    <script src="assets/js/CanvasRenderer.js"></script>
+
+  </head>
+
+  <body>
+
+    <audio id="player">
+      <source type="audio/mp3">
+    </audio>
+
+    <script>
+
+      const fs = require('fs');
+      var files = fs.readdirSync('/home/michael/Music');
+      var mp3 = [];
+      files.forEach( function(file) {
+          if ( file.slice(-3) == 'mp3') { mp3.push(file) }
+      })
+
+      var ctx = new AudioContext();
+      var audioSrc = ctx.createMediaElementSource(player);
+      var analyser = ctx.createAnalyser();
+      audioSrc.connect(analyser);
+      audioSrc.connect(ctx.destination);
+      var frequencyData = new Uint8Array(analyser.frequencyBinCount);
+      analyser.getByteFrequencyData(frequencyData);
+
+      var spacing = 300, side = Math.sqrt( mp3.length ), z = 350;
+      var container, pressed, camera, scene, renderer;
+      var raycaster, mouse;
+      var objects = [], sprites = [];
+      var midpoint = ( side * spacing ) / 2;
+      var cameraReference = new THREE.Vector2( 0, 0 );
+      var moved = false;
+
+      init();
+      animate();
+
+      //---------------------------------------------------------
+
+      function init() {
+
+      	container = document.createElement( 'div' );
+      	document.body.appendChild( container );
+
+      	camera = new THREE.PerspectiveCamera( 70, window.innerWidth / window.innerHeight, 1, 10000 );
+      	camera.position.set( 0, 0, z );
+
+        camera.lookAt( new THREE.Vector3( midpoint, midpoint, 0) );
+
+      	scene = new THREE.Scene();
+
+        var geometry = new THREE.BoxGeometry( 250, 250, 250 );
+
+        var i  = 0;
+
+        for ( var ix = 0; ix < side; ix ++ ) {
+          for ( var iy = 0; iy < side; iy ++ ) {
+
+            if ( i < mp3.length ) {
+
+              var object = new THREE.Mesh( geometry, new THREE.MeshBasicMaterial( { opacity: 0.5 } ) );
+
+              object.position.x = ix * spacing;
+              object.position.y = iy * spacing;
+          		scene.add( object );
+
+              object.name = mp3[i];
+
+          		objects.push( object );
+
+              addText(mp3[i].substring(0, mp3[i].length - 4), ix * spacing, iy * spacing - 40, 0)
+
+            } else { break }
+
+            i ++;
+
+          }
+      	}
+
+        // var geometry = new THREE.SphereGeometry( 200, 10, 32 );
+        //
+        // var object = new THREE.Mesh( geometry, new THREE.MeshBasicMaterial( { opacity: 0.5 } ) );
+        //
+        // object.position.x = 0;
+        // object.position.y = 0;
+        // object.position.z = -200;
+        // scene.add( object );
+        //
+        // object.name = 'text';
+        //
+        // objects.push( object );
+        //
+        // addText('TEXT', 0, 0);
+
+        //---------------------------------------------------------
+
+      	raycaster = new THREE.Raycaster();
+      	mouse = new THREE.Vector2();
+
+      	renderer = new THREE.CanvasRenderer();
+      	renderer.setClearColor( 0x000000 );
+      	renderer.setPixelRatio( window.devicePixelRatio );
+      	renderer.setSize( window.innerWidth, window.innerHeight );
+      	container.appendChild( renderer.domElement );
+
+        document.addEventListener( 'mousedown', onDocumentMouseDown, false );
+        document.addEventListener( 'mouseup', onDocumentMouseUp, false );
+      	document.addEventListener( 'touchstart', onDocumentTouchStart, false );
+        document.addEventListener('mousemove', onDocumentMouseMove, false);
+
+      	window.addEventListener( 'resize', onWindowResize, false );
+
+      }
+
+      //---------------------------------------------------------
+
+      function addText( text, x, y, z ) {
+        var canvas = document.createElement('canvas');
+        var context = canvas.getContext('2d');
+        context.font = "20px Arial";
+        context.fillStyle = "rgba(255, 255, 255, 0.95)";
+        context.fillText(text, 0, 50, 300);
+
+        var texture = new THREE.Texture(canvas);
+        texture.needsUpdate = true;
+
+      	var spriteMaterial = new THREE.SpriteMaterial(
+      		{ map: texture } );
+      	var sprite = new THREE.Sprite( spriteMaterial );
+        sprite.position.set(x, y, z);
+      	sprite.scale.set(250, 200, 1.0);
+      	scene.add( sprite );
+        sprites.push( sprite );
+
+      }
+
+      //---------------------------------------------------------
+
+      function onWindowResize() {
+
+      	camera.aspect = window.innerWidth / window.innerHeight;
+      	camera.updateProjectionMatrix();
+      	renderer.setSize( window.innerWidth, window.innerHeight );
+
+      }
+
+      //---------------------------------------------------------
+
+      function onDocumentTouchStart( event ) {
+
+      	event.preventDefault();
+
+      	event.clientX = event.touches[0].clientX;
+      	event.clientY = event.touches[0].clientY;
+
+      	onDocumentMouseDown( event );
+
+      }
+
+      function onDocumentMouseDown( event ) {
+
+        pressed = true;
+        moved = false;
+
+        cameraReference.x = event.clientX;
+        cameraReference.y = event.clientY;
+      }
+
+        function onDocumentMouseUp( event ) {
+
+          pressed = false;
+
+          if ( !moved ) {
+
+            mouse.x = ( event.clientX / renderer.domElement.clientWidth ) * 2 - 1;
+          	mouse.y = - ( event.clientY / renderer.domElement.clientHeight ) * 2 + 1;
+
+          	raycaster.setFromCamera( mouse, camera );
+
+          	var intersects = raycaster.intersectObjects( objects );
+
+          	if ( intersects.length > 0 ) {
+              if (player.paused) {
+
+                player.src = "/home/michael/Music/" + intersects[ 0 ].object.name;
+
+          		  // intersects[ 0 ].object.material.color.setHex( Math.random() * 0xffffff );
+
+                player.play();
+
+                sprites.forEach( function( sprite ) {
+                  sprite.visible = false
+                })
+
+              } else {
+
+            		player.pause();
+
+                sprites.forEach( function( sprite ) {
+                  sprite.visible = true
+                })
+
+            	}
+
+          	}
+
+          }
+
+        }
+
+        function onDocumentMouseMove( event ) {
+
+          moved = true;
+
+          if ( pressed ) {
+
+            if ( camera.position.x < -600 ) {
+              camera.position.x = -600
+            }
+
+            if ( camera.position.x > side * spacing + 600 ) {
+              camera.position.x = side * spacing + 600
+            }
+
+            if ( camera.position.y < -600 ) {
+              camera.position.y = -600
+            }
+
+            if ( camera.position.y > side * spacing + 600  ) {
+              camera.position.y = side * spacing + 600
+            }
+
+            camera.position.x += ( cameraReference.x - event.clientX ) * 5;
+            camera.position.y -= ( cameraReference.y - event.clientY ) * 5;
+
+            camera.lookAt( new THREE.Vector3( midpoint, midpoint, 0) );
+
+            cameraReference.x = event.clientX;
+            cameraReference.y = event.clientY;
+
+          }
+
+        }
+
+      //---------------------------------------------------------
+
+      function animate() {
+
+      	requestAnimationFrame( animate );
+
+      	render();
+
+      }
+
+      function render() {
+
+        analyser.getByteFrequencyData(frequencyData)
+
+        var i = 0;
+        for ( var j = 0; j < mp3.length; j ++ ) {
+          objects[i].material.color.setRGB(1, frequencyData[i] / 255.0, 0);
+          if ( i < 600 ) { i ++  }
+          else { i = 0 }
+        }
+
+      	renderer.render( scene, camera );
+
+      }
+
+      //---------------------------------------------------------
+
+      const {remote} = require('electron')
+      const {Menu, MenuItem} = remote
+
+      const menu = new Menu()
+      menu.append(new MenuItem({label: 'MenuItem1', click() { console.log('item 1 clicked') }}))
+      menu.append(new MenuItem({type: 'separator'}))
+      menu.append(new MenuItem({label: 'Fullscreen', type: 'checkbox', checked: false}))
+
+      window.addEventListener('contextmenu', (e) => {
+        e.preventDefault()
+        menu.popup(remote.getCurrentWindow())
+      }, false)
+
+    </script>
+
+  </body>
+
+  <script>
+    // You can also require other files to run in this process
+    require('./renderer.js')
+  </script>
+
+</html>
