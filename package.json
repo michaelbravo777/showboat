@@ -1,6 +1,6 @@
 {
   "name": "Showboat",
-  "productName": "Showboat MP3 Player",
+  "productName": "Showboat",
   "version": "0.1.0",
   "description": "A Three.js MP3 Player",
   "main": "main.js",

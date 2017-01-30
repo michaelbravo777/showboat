@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html>
+
+  <head>
+
+    <meta charset="UTF-8">
+
+    <title>Showboat MP3 Player</title>
+
+    <link rel="stylesheet" type="text/css" href="assets/css/style.css">
+
+    <script src="assets/js/three.min.js"></script>
+    <script src="assets/js/Projector.js"></script>
+    <script src="assets/js/CanvasRenderer.js"></script>
+
+  </head>
+
+  <body>
+
+    <audio id="player">
+      <source type="audio/mp3">
+    </audio>
+
+    <script>
+
+      const fs = require('fs')
+      let mp3 = [], configString, config, files
+      const configFilePath = 'showboat.config'
+      if (fs.existsSync( configFilePath )) {
+        configString = fs.readFileSync( configFilePath, 'utf8')
+        config = JSON.parse(configString)
+        files = fs.readdirSync(config.musicPath)
+        files.forEach( ( file ) => {
+            if ( file.slice(-3) == 'mp3') { mp3.push(file) }
+        })
+      }
+      let ctx = new AudioContext(),
+          audioSrc = ctx.createMediaElementSource(player),
+          analyser = ctx.createAnalyser()
+      audioSrc.connect(analyser)
+      audioSrc.connect(ctx.destination)
+      let frequencyData = new Uint8Array(analyser.frequencyBinCount)
+      analyser.getByteFrequencyData(frequencyData)
+
+      const spacing = 300,
+            z = 100,
+            row = 64,
+            col = 16,
+            midpoint = ( row * spacing ) / 2,
+            lookat = new THREE.Vector3( 0, mp3.length * spacing * 2, 0)
+
+      let container, pressed, camera, scene, renderer,
+          raycaster, mouse, moved, group,
+          objects = [], sprites = [],
+          groupReference = new THREE.Vector2( 0, 0 )
+
+      init()
+      animate()
+
+      //---------------------------------------------------------
+
+      function init() {
+
+      	container = document.createElement( 'div' )
+      	document.body.appendChild( container )
+
+      	camera = new THREE.PerspectiveCamera( 70, window.innerWidth / window.innerHeight, 1, 10000 )
+      	camera.position.set( 0, -300, z )
+
+        camera.lookAt( lookat )
+
+      	scene = new THREE.Scene()
+        group = new THREE.Object3D()
+        scene.add( group )
+
+        for ( let i = 0; i < mp3.length; i ++ ) {
+
+          addText( mp3[i], 0, i * spacing, 0 )
+
+      	}
+
+        let geometry = new THREE.BoxGeometry( 200, 200, 10 )
+
+        for ( let iy = 0; iy < row; iy ++ ) {
+          for ( let ix = -col / 2; ix < col / 2; ix ++ ) {
+
+            let object = new THREE.Mesh( geometry, new THREE.MeshBasicMaterial( { opacity: 0.5 } ) )
+
+            object.position.x = ix * spacing
+            object.position.y = iy * spacing
+            object.position.z = -200
+
+        		scene.add( object )
+
+        		objects.push( object )
+
+          }
+        }
+
+
+        for ( let iy = 0; iy < row; iy ++ ) {
+          for ( let ix = -col / 2; ix < col / 2; ix ++ ) {
+
+            let object = new THREE.Mesh( geometry, new THREE.MeshBasicMaterial( { opacity: 0.5 } ) )
+
+            object.position.x = ix * spacing
+            object.position.y = iy * spacing
+            object.position.z = 400
+
+        		scene.add( object )
+
+        		objects.push( object )
+
+          }
+        }
+
+        //---------------------------------------------------------
+
+      	raycaster = new THREE.Raycaster()
+      	mouse = new THREE.Vector2()
+
+      	renderer = new THREE.CanvasRenderer()
+      	renderer.setClearColor( 0x000000 )
+      	renderer.setPixelRatio( window.devicePixelRatio )
+      	renderer.setSize( window.innerWidth, window.innerHeight )
+      	container.appendChild( renderer.domElement )
+
+        document.addEventListener( 'mousedown', onDocumentMouseDown, false )
+        document.addEventListener( 'mouseup', onDocumentMouseUp, false )
+      	document.addEventListener( 'touchstart', onDocumentTouchStart, false )
+        document.addEventListener('mousemove', onDocumentMouseMove, false)
+
+      	window.addEventListener( 'resize', onWindowResize, false )
+
+      }
+
+      //---------------------------------------------------------
+
+      function addText( text, x, y, z ) {
+        let canvas = document.createElement('canvas')
+        let context = canvas.getContext('2d')
+        context.font = "20px Arial"
+        context.fillStyle = "rgba( 255, 255, 255, 0.95 )"
+        context.fillText( text.substring( 0, text.length - 4 ), 0, 50, 300 )
+
+        let texture = new THREE.Texture(canvas)
+        texture.needsUpdate = true
+
+      	let spriteMaterial = new THREE.SpriteMaterial(
+      		{ map: texture } )
+      	let sprite = new THREE.Sprite( spriteMaterial )
+        sprite.position.set(x, y, z)
+      	sprite.scale.set(250, 200, 1.0)
+        sprite.name = text
+      	group.add( sprite )
+        sprites.push( sprite )
+
+      }
+
+      //---------------------------------------------------------
+
+      function onWindowResize() {
+
+      	camera.aspect = window.innerWidth / window.innerHeight
+      	camera.updateProjectionMatrix()
+      	renderer.setSize( window.innerWidth, window.innerHeight )
+
+      }
+
+      //---------------------------------------------------------
+
+      function onDocumentTouchStart( event ) {
+
+      	event.preventDefault()
+
+      	event.clientX = event.touches[0].clientX
+      	event.clientY = event.touches[0].clientY
+
+      	onDocumentMouseDown( event )
+
+      }
+
+      function onDocumentMouseDown( event ) {
+
+        pressed = true
+        moved = false
+
+        groupReference.x = event.clientX
+        groupReference.y = event.clientY
+      }
+
+        function onDocumentMouseUp( event ) {
+
+          pressed = false
+
+          if ( !moved ) {
+
+            mouse.x = ( event.clientX / renderer.domElement.clientWidth ) * 2 - 1
+          	mouse.y = - ( event.clientY / renderer.domElement.clientHeight ) * 2 + 1
+
+          	raycaster.setFromCamera( mouse, camera )
+
+          	let intersects = raycaster.intersectObjects( sprites )
+
+          	if ( intersects.length > 0 ) {
+              if (player.paused) {
+
+                player.src = config.musicPath + "/" + intersects[ 0 ].object.name
+
+                player.play()
+
+              } else {
+
+            		player.pause()
+
+                // sprites.forEach( ( sprite ) => {
+                //   sprite.visible = true
+                // })
+                //
+                // objects.forEach( ( object ) => {
+                //   object.visible = false
+                // })
+
+            	}
+
+          	}
+
+          }
+
+        }
+
+        function onDocumentMouseMove( event ) {
+
+          moved = true
+
+          if ( pressed ) {
+
+            if ( group.position.y > 0 ) {
+              group.position.y = -( mp3.length * spacing )
+            }
+
+            if ( group.position.y < -( mp3.length * spacing ) ) {
+              group.position.y = 0
+            }
+
+            group.position.y += ( groupReference.y - event.clientY ) * 5
+
+            groupReference.x = event.clientX
+            groupReference.y = event.clientY
+
+          }
+
+        }
+
+      //---------------------------------------------------------
+
+      function animate() {
+
+      	requestAnimationFrame( animate )
+
+      	render()
+
+      }
+
+      function render() {
+
+        analyser.getByteFrequencyData(frequencyData)
+
+        i = 0;
+        for ( let k = 0; k < objects.length; k ++ ) {
+          objects[k].material.color.setRGB(1, frequencyData[i] / 255.0, 0);
+          if ( i < 1000 ) { i ++  }
+          else { i = 0 }
+        }
+
+      	renderer.render( scene, camera )
+
+      }
+
+      //---------------------------------------------------------
+
+      const {remote} = require('electron')
+      const {Menu, MenuItem, BrowserWindow, dialog} = remote
+
+      let fullscreen = false, selectPath
+      const menu = new Menu()
+      menu.append(new MenuItem({
+        label: 'Select Music Folder',
+        click() {
+          selectPath = dialog.showOpenDialog(BrowserWindow.getFocusedWindow(), {
+              properties: ['openDirectory']
+          })
+          fs.writeFileSync(configFilePath, '{\"musicPath\":\"' + selectPath + '\"}', 'utf8')
+          remote.getCurrentWindow().reload()
+        }
+      }))
+      menu.append(new MenuItem({type: 'separator'}))
+      menu.append(new MenuItem({
+        label: 'Fullscreen',
+        type: 'checkbox',
+        checked: false,
+        click() {
+          if ( fullscreen == false ) {
+            BrowserWindow.getFocusedWindow().setFullScreen(true)
+            fullscreen = true }
+          else {
+            BrowserWindow.getFocusedWindow().setFullScreen(false)
+            fullscreen = false }
+        }
+      }))
+
+      window.addEventListener('contextmenu', (e) => {
+        e.preventDefault()
+        menu.popup(remote.getCurrentWindow())
+      }, false)
+
+    </script>
+
+  </body>
+
+  <script>
+    // You can also require other files to run in this process
+    require('./renderer.js')
+  </script>
+
+</html>

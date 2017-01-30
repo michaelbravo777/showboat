@@ -1,5 +1,145 @@
-body {
-  margin: 0;
-  padding: 0;
-  overflow: hidden;
-}
+<style>
+
+	html, body {
+		width: 100%;
+		height: 100%;
+	}
+
+	body {
+		background-color: #000000;
+		margin: 0;
+		overflow: hidden;
+		font-family: arial;
+	}
+
+	.button {
+		position: absolute;
+		top: 10px;
+		outline: none;
+		float: left;
+		border: none;
+	}
+
+	#blocker {
+		position: absolute;
+		width: 100%;
+		height: 100%;
+		background-color: rgba(0,0,0,0.5);
+	}
+
+	#instructions {
+		width: 100%;
+		height: 100%;
+		display: -webkit-box;
+		display: -moz-box;
+		display: box;
+		-webkit-box-orient: horizontal;
+		-moz-box-orient: horizontal;
+		box-orient: horizontal;
+		-webkit-box-pack: center;
+		-moz-box-pack: center;
+		box-pack: center;
+		-webkit-box-align: center;
+		-moz-box-align: center;
+		box-align: center;
+		color: #ffffff;
+		text-align: center;
+		cursor: pointer;
+	}
+
+	#audioplayer {
+    border-radius: 10px;
+		position: absolute;
+		width: 650px;
+		height: 50px;
+		top: 90%;
+		left: 50%;
+		transform: translate(-50%);
+		background-color: rgba(1, 15, 15, .8);
+		z-index: 10;
+	}
+
+	#timeline {
+		left: 150px;
+		width: 400px;
+		height: 20px;
+		background: rgba(255,255,255,.3);
+		margin-top: 6px;
+		border-radius: 15px;
+	}
+
+	#playhead {
+		width: 18px;
+		height: 18px;
+		border-radius: 50%;
+		margin-top: 1px;
+		background: rgba(255,255,255,1);
+	}
+
+	.back {
+		left: 50px;
+		background: url('../images/back.png') no-repeat;
+		height: 30px;
+		width: 30px;
+		background-size: 50% 50%;
+		background-position: center;
+	}
+
+	.play {
+		left: 80px;
+		background: url('../images/play.png') no-repeat;
+		height: 30px;
+		width: 30px;
+		background-size: 50% 50%;
+		background-position: center;
+	}
+
+	.pause {
+		left: 80px;
+		background: url('../images/pause.png') no-repeat;
+		height: 30px;
+		width: 30px;
+		background-size: 50% 50%;
+		background-position: center;
+	}
+
+	.forward {
+		left: 110px;
+		background: url('../images/forward.png') no-repeat;
+		height: 30px;
+		width: 30px;
+		background-size: 50% 50%;
+		background-position: center;
+	}
+
+	.shuffle {
+		left: 560px;
+		background: url('../images/shuffle.png') no-repeat;
+		height: 30px;
+		width: 30px;
+		background-size: 50% 50%;
+		background-position: center;
+	}
+
+	.sequential {
+		left: 560px;
+		background: url('../images/sequential.png') no-repeat;
+		height: 30px;
+		width: 30px;
+		background-size: 50% 50%;
+		background-position: center;
+	}
+
+	.visible {
+	  visibility: visible;
+	  opacity: 1;
+	  transition: opacity 1s linear;
+	}
+
+	.hidden {
+	  visibility: hidden;
+	  opacity: 0;
+	  transition: visibility 0s 2s, opacity 2s linear;
+	}
+
+</style>
