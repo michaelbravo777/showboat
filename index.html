@@ -25,7 +25,7 @@
 
   <body>
 
-    <audio id="player">
+    <audio id="player" controls="true">
       <source type="audio/mp3">
     </audio>
 
@@ -41,36 +41,90 @@
 
     <script>
 
-      const fs = require( 'fs' )
+    const { remote } = require( 'electron' ),
+          { Menu, MenuItem, BrowserWindow, dialog } = remote,
+          fs = require( 'fs' ),
+          path = require( 'path' )
+
       var mp3 = [],
           dir = [],
-          configString,
+          objects = [],
+          totalElements = [],
+          totalLength = 0,
+          side = 0,
           config,
-          files
-      const configFilePath = 'showboat.config'
-      if ( fs.existsSync( configFilePath ) ) {
+          files,
+          container,
+          pressed,
+          camera,
+          scene,
+          renderer,
+          raycaster,
+          mouse,
+          moved,
+          group,
+          duration,
+          timer,
+          overPlayer,
+          selected,
+          current,
+          groupReference = new THREE.Vector2( 0, 0 )
+
+      if ( remote.getGlobal( 'config' ) ) {
+
         try {
-          configString = fs.readFileSync( configFilePath, 'utf8' )
+
+          files = fs.readdirSync( remote.getGlobal( 'config' ).musicPath )
+
         } catch ( err ) {
-          console.log( "error reading config file" )
+
+          console.log( "error reading directory " + remote.getGlobal( 'config' ).musicPath )
+
         }
-        config = JSON.parse( configString )
-        try {
-          files = fs.readdirSync( config.musicPath )
-        } catch ( err ) {
-          console.log( "error reading directory " + config.musicPath )
-        }
+
         if ( files ) {
+
           dir.push( "Parent.par" )
+
           files.forEach( ( file ) => {
-            var stats = fs.statSync( config.musicPath + "/" + file )
+
+            var stats = fs.statSync( path.format( { dir: remote.getGlobal( 'config' ).musicPath, base: file } ) )
             if ( stats.isDirectory() ) { dir.push( file + ".dir" ) }
             if ( file.slice( - 3 ) == 'mp3' ) { mp3.push( file ) }
+
           } )
+
+          totalElements = dir.concat(mp3)
+          totalLength = totalElements.length
+          side = Math.cbrt(totalLength)
+
           if ( mp3.length > 0 ) {
-            player.src = config.musicPath + "/" + mp3[0]
+
+            if ( remote.getGlobal( 'config' ).shuffle ) {
+
+              current = dir.length + Math.floor( Math.random() * mp3.length )
+
+              setSource()
+
+            } else {
+
+              current = dir.length
+
+              setSource()
+
+            }
           }
+
         }
+
+        if ( remote.getGlobal( 'config' ).shuffle ) {
+
+          pShuffle.className = ""
+          pShuffle.className = "button sequential"
+          pShuffle.title = "Sequential Play"
+
+        }
+
       }
 
       audioplayer.addEventListener( "mouseover", () => { overPlayer = true }, false)
@@ -91,10 +145,6 @@
       var frequencyData = new Uint8Array( analyser.frequencyBinCount )
       analyser.getByteFrequencyData( frequencyData )
 
-      const totalElements = dir.concat(mp3),
-            totalLength = totalElements.length,
-            side = Math.cbrt(totalLength)
-
       if ( totalLength < 100 ) {
         var spacing = 27
       } else if ( totalLength < 1000 ) {
@@ -103,26 +153,59 @@
         var spacing = 50
       }
 
-      var container,
-          pressed,
-          camera,
-          scene,
-          renderer,
-          raycaster,
-          mouse,
-          moved,
-          group,
-          duration,
-          timer,
-          overPlayer,
-          selected = 0,
-          current = 0,
-          objects = [],
-          shuffle = false,
-          groupReference = new THREE.Vector2( 0, 0 )
-
       init()
       animate()
+
+      var i = 0
+      for ( var iz = 0; iz > -side; iz -- ) {
+        for ( var iy = 0; iy > -side; iy -- ) {
+            for ( var ix = 0; ix < side; ix ++ ) {
+
+            if ( i < totalLength ) {
+              addText( totalElements[ i ], i, ix * spacing, iy * spacing, iz * spacing )
+            }
+
+            i ++
+
+          }
+        }
+      }
+
+
+      //---------------------------------------------------------
+
+      var fullscreen = false, selectPath
+      const menu = new Menu()
+      menu.append( new MenuItem( {
+        label: 'Select Music Folder',
+        click() {
+          remote.getGlobal( 'config' ).musicPath = dialog.showOpenDialog( BrowserWindow.getFocusedWindow(), {
+              properties: [ 'openDirectory' ]
+          })[0]
+          if ( remote.getGlobal( 'config' ).musicPath ) {
+            remote.getCurrentWindow().reload()
+          }
+        }
+      } ) )
+      menu.append( new MenuItem( {type: 'separator'} ) )
+      menu.append( new MenuItem( {
+        label: 'Fullscreen',
+        type: 'checkbox',
+        checked: false,
+        click() {
+          if ( fullscreen == false ) {
+            BrowserWindow.getFocusedWindow().setFullScreen( true )
+            fullscreen = true }
+          else {
+            BrowserWindow.getFocusedWindow().setFullScreen( false )
+            fullscreen = false }
+        }
+      }))
+
+      window.addEventListener( 'contextmenu', ( event ) => {
+        event.preventDefault()
+        menu.popup( remote.getCurrentWindow() )
+      }, false )
 
       //---------------------------------------------------------
 
@@ -141,21 +224,6 @@
       	scene = new THREE.Scene()
         group = new THREE.Object3D()
         scene.add( group )
-
-        var i = 0
-        for ( var iz = 0; iz > -side; iz -- ) {
-          for ( var iy = 0; iy > -side; iy -- ) {
-              for ( var ix = 0; ix < side; ix ++ ) {
-
-              if ( i < totalLength ) {
-                addText( totalElements[ i ], i, ix * spacing, iy * spacing, iz * spacing )
-              }
-
-              i ++
-
-            }
-          }
-      	}
 
         //---------------------------------------------------------
 
@@ -278,7 +346,7 @@
 
           if ( totalElements[ selected ].slice( - 3 ) == 'par' ) {
 
-            fs.writeFileSync( configFilePath, '{\"musicPath\":\"' + config.musicPath.substring( 0, config.musicPath.lastIndexOf( "/" ) ) + '\"}', 'utf8' )
+            remote.getGlobal( 'config' ).musicPath = path.resolve( remote.getGlobal( 'config' ).musicPath, '..')
 
             remote.getCurrentWindow().reload()
 
@@ -286,9 +354,7 @@
 
           else if ( totalElements[ selected ].slice( - 3 ) == 'dir' ) {
 
-            var subfolder = totalElements[ selected ].substring( 0, totalElements[ selected ].length - 4 )
-
-            fs.writeFileSync( configFilePath, '{\"musicPath\":\"' + config.musicPath + "/" + subfolder + '\"}', 'utf8' )
+            remote.getGlobal( 'config' ).musicPath = path.resolve( remote.getGlobal( 'config' ).musicPath, totalElements[ selected ].substring( 0, totalElements[ selected ].length - 4 ))
 
             remote.getCurrentWindow().reload()
 
@@ -296,7 +362,7 @@
 
             current = selected
 
-            player.src = config.musicPath + "/" + totalElements[ current ]
+            setSource()
 
             playAudio()
 
@@ -317,55 +383,59 @@
         clearTimeout( timer )
         audioplayer.className = "visible"
 
-        mouse.x = ( event.clientX / renderer.domElement.clientWidth ) * 2 - 1
-      	mouse.y = - ( event.clientY / renderer.domElement.clientHeight ) * 2 + 1
+        if ( !overPlayer ) {
 
-      	raycaster.setFromCamera( mouse, camera )
+          mouse.x = ( event.clientX / renderer.domElement.clientWidth ) * 2 - 1
+        	mouse.y = - ( event.clientY / renderer.domElement.clientHeight ) * 2 + 1
 
-      	var intersects = raycaster.intersectObjects( objects )
+        	raycaster.setFromCamera( mouse, camera )
 
-      	if ( intersects.length > 0 ) {
+        	var intersects = raycaster.intersectObjects( objects )
 
-          for ( var i = 0; i < objects.length; i ++ ) {
-            if ( intersects[ 0 ].object == objects[ i ] ) {
-              intersects[ 0 ].object.material.color.set( 0x777777 )
-              selected = intersects[ 0 ].object.number
-            } else {
-              objects[ i ].material.color.set( 0xffffff )
+        	if ( intersects.length > 0 ) {
+
+            for ( var i = 0; i < objects.length; i ++ ) {
+              if ( intersects[ 0 ].object == objects[ i ] ) {
+                intersects[ 0 ].object.material.color.set( 0x777777 )
+                selected = intersects[ 0 ].object.number
+              } else {
+                objects[ i ].material.color.set( 0xffffff )
+              }
             }
+
           }
+
+          moved = true
+
+          if ( pressed ) {
+
+            group.position.x -= groupReference.x - event.clientX
+            group.position.y += groupReference.y - event.clientY
+
+            groupReference.x = event.clientX
+            groupReference.y = event.clientY
+
+            if ( group.position.y < 0 ) {
+              group.position.y = 0
+            }
+
+            if ( group.position.y > side * spacing ) {
+              group.position.y = side * spacing
+            }
+
+            if ( group.position.x > 0 ) {
+              group.position.x = 0
+            }
+
+            if ( group.position.x < - side * spacing ) {
+              group.position.x = - side * spacing
+            }
+
+          }
+
+          timer = setTimeout( hidePlayer, 3000 )
 
         }
-
-        moved = true
-
-        if ( pressed ) {
-
-          group.position.x -= groupReference.x - event.clientX
-          group.position.y += groupReference.y - event.clientY
-
-          groupReference.x = event.clientX
-          groupReference.y = event.clientY
-
-          if ( group.position.y < 0 ) {
-            group.position.y = 0
-          }
-
-          if ( group.position.y > side * spacing ) {
-            group.position.y = side * spacing
-          }
-
-          if ( group.position.x > 0 ) {
-            group.position.x = 0
-          }
-
-          if ( group.position.x < - side * spacing ) {
-            group.position.x = - side * spacing
-          }
-
-        }
-
-        if ( !overPlayer ) { timer = setTimeout( hidePlayer, 3000 ) }
 
       }
 
@@ -393,10 +463,10 @@
 
       function playBack() {
 
-        if ( current > dir.length + 1 ) { current -- }
+        if ( current > dir.length ) { current -- }
         else { current = totalLength - 1 }
 
-        player.src = config.musicPath + "/" + totalElements[ current ]
+        setSource()
 
         playAudio()
 
@@ -406,18 +476,18 @@
 
       function playForward() {
 
-        if ( shuffle ) {
+        if ( remote.getGlobal( 'config' ).shuffle ) {
 
-          current = dir.length - Math.floor( Math.random() * mp3.length )
+          current = dir.length + Math.floor( Math.random() * mp3.length )
 
         } else {
 
           if ( current < totalLength - 1 ) { current ++ }
-          else { current = dir.length + 1 }
+          else { current = dir.length }
 
         }
 
-        player.src = config.musicPath + "/" + totalElements[ current ]
+        setSource()
 
         playAudio()
 
@@ -428,12 +498,12 @@
       function playAudio() {
 
         if ( player.paused ) {
-      		player.play();
+      		player.play()
       		pPlay.className = ""
       		pPlay.className = "button pause"
           pPlay.title = "Pause"
       	} else {
-      		player.pause();
+      		player.pause()
       		pPlay.className = ""
       		pPlay.className = "button play"
           pPlay.title = "Play"
@@ -445,13 +515,13 @@
 
       function playShuffle() {
 
-      	if ( shuffle ) {
-          shuffle = false
+      	if ( remote.getGlobal( 'config' ).shuffle ) {
+          remote.getGlobal( 'config' ).shuffle = false
       		pShuffle.className = ""
       		pShuffle.className = "button shuffle"
           pShuffle.title = "Shuffle"
       	} else {
-          shuffle  = true
+          remote.getGlobal( 'config' ).shuffle  = true
       		pShuffle.className = ""
       		pShuffle.className = "button sequential"
           pShuffle.title = "Sequential Play"
@@ -498,6 +568,17 @@
 
       //---------------------------------------------------------
 
+      function setSource() {
+
+        player.src = path.format( {
+          dir: remote.getGlobal( 'config' ).musicPath,
+          base: totalElements[ current ]
+        })
+
+      }
+
+      //---------------------------------------------------------
+
       function animate() {
 
       	requestAnimationFrame( animate )
@@ -525,45 +606,6 @@
       	renderer.render( scene, camera )
 
       }
-
-      //---------------------------------------------------------
-
-      const { remote } = require( 'electron' ),
-            { Menu, MenuItem, BrowserWindow, dialog } = remote
-
-      var fullscreen = false, selectPath
-      const menu = new Menu()
-      menu.append( new MenuItem( {
-        label: 'Select Music Folder',
-        click() {
-          selectPath = dialog.showOpenDialog( BrowserWindow.getFocusedWindow(), {
-              properties: [ 'openDirectory' ]
-          })
-          if ( selectPath ) {
-            fs.writeFileSync( configFilePath, '{\"musicPath\":\"' + selectPath + '\"}', 'utf8' )
-            remote.getCurrentWindow().reload()
-          }
-        }
-      } ) )
-      menu.append( new MenuItem( {type: 'separator'} ) )
-      menu.append( new MenuItem( {
-        label: 'Fullscreen',
-        type: 'checkbox',
-        checked: false,
-        click() {
-          if ( fullscreen == false ) {
-            BrowserWindow.getFocusedWindow().setFullScreen( true )
-            fullscreen = true }
-          else {
-            BrowserWindow.getFocusedWindow().setFullScreen( false )
-            fullscreen = false }
-        }
-      }))
-
-      window.addEventListener( 'contextmenu', ( event ) => {
-        event.preventDefault()
-        menu.popup( remote.getCurrentWindow() )
-      }, false )
 
     </script>
 

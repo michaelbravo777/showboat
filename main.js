@@ -8,6 +8,17 @@ const nativeImage = electron.nativeImage
 
 const path = require('path')
 const url = require('url')
+const fs = require( 'fs' )
+const configFilePath = 'showboat.config'
+
+if ( fs.existsSync( configFilePath ) ) {
+  try {
+    var configString = fs.readFileSync( configFilePath, 'utf8' )
+  } catch ( err ) {
+    console.log( "error reading config file" )
+  }
+  global.config = JSON.parse( configString )
+}
 
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.
@@ -41,6 +52,12 @@ function createWindow () {
     // Dereference the window object, usually you would store windows
     // in an array if your app supports multi windows, this is the time
     // when you should delete the corresponding element.
+    fs.writeFileSync(
+      configFilePath,
+      '{\"musicPath\":\"' + global.config.musicPath + '\",\"shuffle\":' + global.config.shuffle + '}',
+      'utf8'
+    )
+
     mainWindow = null
   })
 
