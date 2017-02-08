@@ -1,9 +1,10 @@
 const electron = require('electron')
 
 const app = electron.app
+const Menu = electron.Menu
+const dialog = electron.dialog
 const BrowserWindow = electron.BrowserWindow
 const nativeImage = electron.nativeImage
-// const Menu = electron.Menu
 // const Tray = electron.Tray
 
 const path = require('path')
@@ -15,10 +16,58 @@ if ( fs.existsSync( configFilePath ) ) {
   try {
     var configString = fs.readFileSync( configFilePath, 'utf8' )
   } catch ( err ) {
-    console.log( "error reading config file" )
+    console.log( 'error reading config file' )
   }
   global.config = JSON.parse( configString )
+} else {
+  global.config = { musicPath: '', shuffle: 'false', colors: 'Red and Yellow' }
 }
+
+const template = [
+    {
+      label: 'Showboat',
+      submenu: [
+        {
+          label: 'Select Music Folder',
+          click: () => {
+            let dir = dialog.showOpenDialog( mainWindow, { properties: ['openDirectory'] } )
+            if ( dir != undefined ) {
+              global.config.musicPath = dir[0]
+              mainWindow.reload()
+            }
+          }
+        },
+        {
+          type: 'separator'
+        },
+        {
+          role: 'reload'
+        },
+        {
+          type: 'separator'
+        },
+        {
+          role: 'toggledevtools'
+        },
+        {
+          type: 'separator'
+        },
+        {
+          role: 'togglefullscreen'
+        },
+        {
+          role: 'zoomin'
+        },
+        {
+          role: 'zoomout'
+        }
+      ]
+    }
+]
+
+const menu = Menu.buildFromTemplate(template)
+
+Menu.setApplicationMenu(menu)
 
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.
@@ -54,7 +103,7 @@ function createWindow () {
     // when you should delete the corresponding element.
     fs.writeFileSync(
       configFilePath,
-      '{\"musicPath\":\"' + global.config.musicPath + '\",\"shuffle\":' + global.config.shuffle + '}',
+      JSON.stringify( global.config ),
       'utf8'
     )
 
