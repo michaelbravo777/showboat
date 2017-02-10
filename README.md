@@ -12,10 +12,10 @@ Navigate to a folder or select a song to play.
 
 ![](/../screenshots/Screenshot from 2017-02-09 22-31-06.png?raw=true)
 
-Select your music folder to get started.
+Click on visuals.
 
 ![](/../screenshots/Screenshot from 2017-02-09 22-31-56.png?raw=true)
 
-Select your music folder to get started.
+Right click to change colors.
 
 ![](/../screenshots/Screenshot from 2017-02-09 22-32-11.png?raw=true)
