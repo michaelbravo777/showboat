@@ -12,9 +12,9 @@ const url = require('url')
 const fs = require( 'fs' )
 const configFilePath = 'showboat.config'
 
-if ( fs.existsSync( configFilePath ) ) {
+if ( fs.existsSync( path.resolve(app.getAppPath(), configFilePath) ) ) {
   try {
-    var configString = fs.readFileSync( configFilePath, 'utf8' )
+    var configString = fs.readFileSync( path.resolve(app.getAppPath(), configFilePath), 'utf8' )
   } catch ( err ) {
     console.log( 'error reading config file' )
   }
@@ -23,49 +23,7 @@ if ( fs.existsSync( configFilePath ) ) {
   global.config = { musicPath: '', shuffle: 'false', colors: 'Red and Yellow' }
 }
 
-const template = [
-    {
-      label: 'Showboat',
-      submenu: [
-        {
-          label: 'Select Music Folder',
-          click: () => {
-            let dir = dialog.showOpenDialog( mainWindow, { properties: ['openDirectory'] } )
-            if ( dir != undefined ) {
-              global.config.musicPath = dir[0]
-              mainWindow.reload()
-            }
-          }
-        }
-        // {
-        //   type: 'separator'
-        // },
-        // {
-        //   role: 'reload'
-        // },
-        // {
-        //   type: 'separator'
-        // },
-        // {
-        //   role: 'toggledevtools'
-        // },
-        // {
-        //   type: 'separator'
-        // },
-        // {
-        //   role: 'togglefullscreen'
-        // },
-        // {
-        //   role: 'zoomin'
-        // },
-        // {
-        //   role: 'zoomout'
-        // }
-      ]
-    }
-]
-
-const menu = Menu.buildFromTemplate(template)
+const menu = Menu.buildFromTemplate([])
 
 Menu.setApplicationMenu(menu)
 
@@ -77,10 +35,8 @@ let mainWindow
 function createWindow () {
   // Create the browser window.
   mainWindow = new BrowserWindow({
-     titleBarStyle: 'hidden',
-     width: 1281,
-     height: 800,
-     show: false,
+     width: 800,
+     height: 600,
      icon: nativeImage.createFromPath(__dirname, 'assets/icons/png/icon.png')})
 
   mainWindow.maximize()
@@ -102,7 +58,7 @@ function createWindow () {
     // in an array if your app supports multi windows, this is the time
     // when you should delete the corresponding element.
     fs.writeFileSync(
-      configFilePath,
+      path.resolve(app.getAppPath(), configFilePath),
       JSON.stringify( global.config ),
       'utf8'
     )

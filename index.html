@@ -62,7 +62,7 @@
             elementsLength,
             side,
             spacingWidth = 30,
-            spacingDepth = 30,
+            spacingDepth = 40,
             spacingHeight,
             container,
             pressed,
@@ -87,15 +87,6 @@
             controls,
             fullscreen = false,
             spriteGroupReference = new THREE.Vector2( 0, 0 )
-
-      if ( remote.getGlobal( 'config' ).musicPath == "" ) {
-        var div = document.createElement("div")
-        div.style.width = "800px"
-        div.style.height = "200px"
-        div.innerHTML = " └─Select Music Folder"
-
-        document.getElementById("select").appendChild(div)
-      }
 
       if ( remote.getGlobal( 'config' ) ) {
 
@@ -207,41 +198,68 @@
 
       const menu = new Menu()
 
-      const colorArray = [
-        ['Red and Yellow', function ( freq ) { return new THREE.Color('rgb(255, ' + freq + ', 0)') } ],
-        ['Yellow', function ( freq ) { return new THREE.Color('rgb(' + freq + ', ' + freq + ', 0)') } ],
-        ['Red', function ( freq ) { return new THREE.Color('rgb(' + freq + ', 1, 0)') } ],
-        ['Green', function ( freq ) { return new THREE.Color('rgb(0, ' + freq + ', 0)') } ],
-        ['Blue', function ( freq ) { return new THREE.Color('rgb(0, 0, ' + freq + ')') } ],
-        ['Magenta', function ( freq ) { return new THREE.Color('rgb(' + freq + ', 1, ' + freq + ')') } ]
-      ]
-
-      let selectedColors = false
-      var calculateColor
-
-      colorArray.forEach( ( element ) => {
-
-        if ( remote.getGlobal( 'config' ).colors == element[0] ) {
-          selectedColors = true
-          calculateColor = element[1]
-        } else { selectedColors = false }
+      if ( remote.getGlobal( 'config' ).musicPath == '' ) {
+        var div = document.createElement('div')
+        div.className = 'startup'
+        div.innerHTML = "right click and 'Select Music Folder' to get started"
+        document.body.appendChild(div)
 
         menu.append( new MenuItem( {
-          label: element[0],
-          type: 'radio',
-          checked: selectedColors,
+          label: 'Select Music Folder',
           click( event ) {
-            remote.getGlobal( 'config' ).colors = element[0]
-            calculateColor = element[1]
+            let dir = dialog.showOpenDialog(BrowserWindow.getFocusedWindow(), { properties: ['openDirectory'] } )
+            if ( dir != undefined ) {
+              remote.getGlobal( 'config' ).musicPath = dir[0]
+              remote.getCurrentWindow().reload()
+            }
           }
         }))
 
-      } )
+        window.addEventListener( 'contextmenu', (event) => {
+          event.preventDefault()
+          menu.popup( remote.getCurrentWindow() )
+        }, false)
 
-      window.addEventListener( 'contextmenu', (event) => {
-        event.preventDefault()
-        if ( visuals ) { menu.popup( remote.getCurrentWindow() ) }
-      }, false)
+
+      } else {
+
+        const colorArray = [
+          ['Red and Yellow', function ( freq ) { return new THREE.Color('rgb(255, ' + freq + ', 0)') } ],
+          ['Yellow', function ( freq ) { return new THREE.Color('rgb(' + freq + ', ' + freq + ', 0)') } ],
+          ['Red', function ( freq ) { return new THREE.Color('rgb(' + freq + ', 1, 0)') } ],
+          ['Green', function ( freq ) { return new THREE.Color('rgb(0, ' + freq + ', 0)') } ],
+          ['Blue', function ( freq ) { return new THREE.Color('rgb(0, 0, ' + freq + ')') } ],
+          ['Magenta', function ( freq ) { return new THREE.Color('rgb(' + freq + ', 1, ' + freq + ')') } ]
+        ]
+
+        let selectedColors = false
+        var calculateColor
+
+        colorArray.forEach( ( element ) => {
+
+          if ( remote.getGlobal( 'config' ).colors == element[0] ) {
+            selectedColors = true
+            calculateColor = element[1]
+          } else { selectedColors = false }
+
+          menu.append( new MenuItem( {
+            label: element[0],
+            type: 'radio',
+            checked: selectedColors,
+            click( event ) {
+              remote.getGlobal( 'config' ).colors = element[0]
+              calculateColor = element[1]
+            }
+          }))
+
+        })
+
+        window.addEventListener( 'contextmenu', (event) => {
+          event.preventDefault()
+          if ( visuals ) { menu.popup( remote.getCurrentWindow() ) }
+        }, false)
+
+      }
 
       //---------------------------------------------------------
 
@@ -251,7 +269,7 @@
       	document.body.appendChild( container )
 
       	camera = new THREE.PerspectiveCamera( 70, window.innerWidth / window.innerHeight, 1, 10000 )
-      	camera.position.set( 0, 0, 25 )
+      	camera.position.set( 0, 0, 35 )
 
         camera.lookAt( new THREE.Vector3( 0, 0, 0 ) )
 

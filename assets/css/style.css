@@ -10,8 +10,18 @@
 		margin: 0;
 		overflow: hidden;
 		font-family: courier;
-		font-size: 40px;
+		font-size: 16px;
 		color: #ffffff;
+	}
+
+	.startup {
+	  position: absolute;
+	  width: 800px;
+	  height: 200px;
+	  top: 50%;
+	  left: 50%;
+	  margin: -100px 0 0 -400px;
+		text-align: center;
 	}
 
 	.button {
