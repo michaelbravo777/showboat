@@ -1,13 +1,3 @@
-<!--
-
-▄▄▄▄▄▄▄▄▄        █              █   ██▀█
-██  █   █ ■ ▄▄▄▄ █▄▄▄ ▄▄▄▄ ▄▄▄▄ █   ██▄█  ▄▄▄ ▄▄▄▄ ▄  ▄ ▄▄▄▄
-██  █   █ █ ██   ██ █ ▄▄▄█ ██▄█ ██  ██ ██ ██  ▄▄▄█ ██ █ ██ █
-██  █   █ █ ██▄▄ ██ █ ██▄█ ██▄▄ ██  ██▄██ ██  ██▄█  ██  ██▄█
-
--->
-
-
 <!DOCTYPE html>
 <html>
 
@@ -20,6 +10,9 @@
     <link rel='stylesheet' type='text/css' href='assets/css/style.css'>
 
     <script src='assets/js/three.min.js'></script>
+    <script src='assets/js/render.js'></script>
+    <script src='assets/js/player.js'></script>
+    <script src='assets/js/controls.js'></script>
 
   </head>
 
@@ -29,7 +22,82 @@
       <source type='audio/mp3'>
     </audio>
 
-    <div id='select'></div>
+    <div class='instructions'>
+      <span class="close-btn" onclick='toggleInstructions()'><a href="#">X</a></span>
+      <div class='center'><p>menu then 'Select Music Folder' to get started</p></div>
+      <table>
+        <tr>
+          <th></th>
+          <th class='center'>mouse</th>
+          <th class='center'>shortcut</th>
+        </tr>
+        <tr>
+          <td>menu</td>
+          <td class='center'>right click</td>
+          <td class='center'>m</td>
+        </tr>
+        <tr>
+          <td>select</td>
+          <td class='center'>left click</td>
+          <td class='center'>enter</td>
+        </tr>
+        <tr>
+          <td>navigate</td>
+          <td class='center'>click and drag</td>
+          <td class='center'>arrow keys</td>
+        </tr>
+        <tr>
+          <td>zoom in/out</td>
+          <td class='center'>mouse wheel</td>
+          <td class='center'>shift/control</td>
+        </tr>
+        <tr>
+          <td>play/pause</td>
+          <td class='center'><img src='assets/images/play.png' alt='play' height="10"/></td>
+          <td class='center'>space</td>
+        </tr>
+        <tr>
+          <td>shuffle</td>
+          <td class='center'><img src='assets/images/shuffle.png' alt='play' height="10"/></td>
+          <td class='center'>b</td>
+        </tr>
+        <tr>
+          <td>next song</td>
+          <td class='center'><img src='assets/images/forward.png' alt='play' height="10"/></td>
+          <td class='center'>x</td>
+        </tr>
+        <tr>
+          <td>prev song</td>
+          <td class='center'><img src='assets/images/back.png' alt='play' height="10"/></td>
+          <td class='center'>z</td>
+        </tr>
+        <tr>
+          <td>visuals</td>
+          <td class='center'><img src='assets/images/visuals.png' alt='play' height="10"/></td>
+          <td class='center'>v</td>
+        </tr>
+        <tr>
+          <td>change color (visuals)</td>
+          <td class='center'></td>
+          <td class='center'>c</td>
+        </tr>
+        <tr>
+          <td>change shape (visuals)</td>
+          <td class='center'></td>
+          <td class='center'>s</td>
+        </tr>
+        <tr>
+          <td>fullscreen</td>
+          <td class='center'><img src='assets/images/fullscreen.png' alt='play' height="10"/></td>
+          <td class='center'>f</td>
+        </tr>
+        <tr>
+          <td>instructions</td>
+          <td class='center'></td>
+          <td class='center'>i</td>
+        </tr>
+      </table>
+    </div>
 
     <div id='audioplayer' class='hidden'>
       <button id='pBack' class='button back' onclick='playBack()' title='Back'></button>
@@ -39,247 +107,59 @@
     		<div id='playhead'></div>
     	</div>
       <button id='pShuffle' class='button shuffle' onclick='playShuffle()' title='Shuffle'></button>
-      <button id='pVisuals' class='button visuals' onclick='renderVisuals()' title='Visuals'></button>
+      <button id='pVisuals' class='button visuals' onclick='toggleVisuals()' title='Visuals'></button>
       <button id='pFullScreen' class='button fullScreen' onclick='fullScreen()' title='Fullscreen'></button>
     </div>
 
     <script>
 
+    var renderer, scene, camera, timer, current, mouse, analyser,
+        elements, elementsLength, cubeSide, duration, calculateColor,
+        overPlayer, overTimeline, movePlayhead, pressed, frequencyData,
+        spacingWidth = 30, spacingDepth = 40, spacingHeight, zCam = 80,
+        sprites = [], spriteGroup, cubes = [], cubeGroup, mp3 = [],
+        dir = [ { name: 'Parent', type: 'Parent' } ],
+        reference = new THREE.Vector2( 0, 0 ),
+        visuals = false,
+        instructions = document.getElementsByClassName('instructions')[0],
+        selected = 0
+
+    const { remote } = require( 'electron' ),
+          { Menu, MenuItem, BrowserWindow, dialog } = remote,
+          fs = require( 'fs' ),
+          path = require( 'path' ),
+          menu = new Menu()
+
+    const colorFunctionArray = [
+      function ( freq ) { return new THREE.Color('rgb(255, ' + freq + ', 0)') },
+      function ( freq ) { return new THREE.Color('rgb(' + freq + ', ' + freq + ', 0)') },
+      function ( freq ) { return new THREE.Color('rgb(' + freq + ', 0, 0)') },
+      function ( freq ) { return new THREE.Color('rgb(0, ' + freq + ', 0)') },
+      function ( freq ) { return new THREE.Color('rgb(0, 0, ' + freq + ')') },
+      function ( freq ) { return new THREE.Color('rgb(' + freq + ', 0, ' + freq + ')') },
+      function ( freq ) { return new THREE.Color('rgb(' + freq + ', 0, 255)') },
+      function ( freq ) { return new THREE.Color('rgb(' + freq + ', 255, ' + freq + ')') },
+      function ( freq ) { return new THREE.Color('rgb(' + freq + ', 127, 127)') },
+      function ( freq ) { return new THREE.Color('rgb(' + freq + ', 63, 0)') }
+    ]
+
       init()
       animate()
-
-      const { remote } = require( 'electron' ),
-            { Menu, MenuItem, BrowserWindow, dialog } = remote,
-            fs = require( 'fs' ),
-            path = require( 'path' )
-
-        var mp3 = [],
-            dir = [ { name: 'Parent', type: 'Parent' } ],
-            sprites = [],
-            config,
-            files,
-            elements,
-            elementsLength,
-            side,
-            spacingWidth = 30,
-            spacingDepth = 40,
-            spacingHeight,
-            container,
-            pressed,
-            camera,
-            scene,
-            renderer,
-            raycaster,
-            mouse,
-            moved,
-            spriteGroup,
-            duration,
-            timer,
-            overPlayer,
-            overTimeline,
-            movePlayhead,
-            selected,
-            current,
-            rendered = false,
-            visuals = false,
-            objects = [],
-            objectGroup,
-            controls,
-            fullscreen = false,
-            spriteGroupReference = new THREE.Vector2( 0, 0 )
-
-      if ( remote.getGlobal( 'config' ) ) {
-
-        try {
-
-          files = fs.readdirSync( remote.getGlobal( 'config' ).musicPath )
-
-        } catch ( err ) {
-
-          console.log( 'error reading directory ' + remote.getGlobal( 'config' ).musicPath )
-
-        }
-
-        if ( files ) {
-
-          files.forEach( ( file ) => {
-
-            let stats = fs.statSync( path.format( { dir: remote.getGlobal( 'config' ).musicPath, base: file } ) )
-            if ( stats.isDirectory() && file.charAt( 0 ) != '.' ) {
-              dir.push( { name: file, type: 'Directory' } )
-            } else if ( file.slice( -3 ) == 'mp3' ) {
-              mp3.push( { name: file.slice( 0, -4 ), type: 'mp3' } )
-            }
-
-          })
-
-          elements = dir.concat(mp3),
-          elementsLength = elements.length,
-          side = Math.cbrt(elementsLength)
-
-          if ( mp3.length > 0 ) {
-
-            if ( remote.getGlobal( 'config' ).shuffle == true ) {
-
-              current = dir.length + Math.floor( Math.random() * mp3.length )
-
-              setSource()
-
-            } else {
-
-              current = dir.length
-
-              setSource()
-
-            }
-
-          }
-
-        }
-
-        if ( remote.getGlobal( 'config' ).shuffle == true ) {
-
-          pShuffle.className = ''
-          pShuffle.className = 'button sequential'
-          pShuffle.title = 'Sequential Play'
-
-        }
-
-      }
-
-      if ( elementsLength < 100 ) {
-        spacingHeight = 20
-      } else if ( elementsLength < 1000 ) {
-        spacingHeight = 30
-      } else {
-        spacingHeight = 40
-      }
-
-      let i = 0
-      for ( let iz = 0; iz > -side; iz -- ) {
-        for ( let iy = 0; iy > -side; iy -- ) {
-            for ( let ix = 0; ix < side; ix ++ ) {
-
-            if ( i < elementsLength ) {
-              addSprite( elements[ i ].name, elements[ i ].type, i, ix * spacingWidth, iy * spacingHeight, iz * spacingDepth )
-            }
-
-            i ++
-
-          }
-        }
-      }
-
-      document.addEventListener( 'mousedown', onDocumentMouseDown, false )
-      document.addEventListener( 'mouseup', onDocumentMouseUp, false )
-      document.addEventListener( 'wheel', onDocumentWheel, {passive: true} )
-      document.addEventListener( 'mousemove', onDocumentMouseMove, false )
-
-      window.addEventListener( 'resize', onWindowResize, false )
-
-      audioplayer.addEventListener( 'mouseover', () => { overPlayer = true }, false)
-      audioplayer.addEventListener( 'mouseout', () => { overPlayer = false }, false)
-      player.addEventListener( 'ended', playForward, false )
-      player.addEventListener( 'timeupdate', timeUpdate, false )
-      player.addEventListener( 'canplaythrough', () => { duration = player.duration }, false )
-      timeline.addEventListener( 'mouseover', () => { overTimeline = true }, false)
-      timeline.addEventListener( 'mouseout', () => { overTimeline = false }, false)
-
-      let context = new AudioContext(),
-          audioSrc = context.createMediaElementSource( player ),
-          analyser = context.createAnalyser()
-      audioSrc.connect( analyser )
-      audioSrc.connect( context                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   .destination )
-      var frequencyData = new Uint8Array( analyser.frequencyBinCount )
-      analyser.getByteFrequencyData( frequencyData )
-
-
-      //---------------------------------------------------------
-
-      const menu = new Menu()
-
-      if ( remote.getGlobal( 'config' ).musicPath == '' ) {
-        var div = document.createElement('div')
-        div.className = 'startup'
-        div.innerHTML = "right click and 'Select Music Folder' to get started"
-        document.body.appendChild(div)
-
-        menu.append( new MenuItem( {
-          label: 'Select Music Folder',
-          click( event ) {
-            let dir = dialog.showOpenDialog(BrowserWindow.getFocusedWindow(), { properties: ['openDirectory'] } )
-            if ( dir != undefined ) {
-              remote.getGlobal( 'config' ).musicPath = dir[0]
-              remote.getCurrentWindow().reload()
-            }
-          }
-        }))
-
-        window.addEventListener( 'contextmenu', (event) => {
-          event.preventDefault()
-          menu.popup( remote.getCurrentWindow() )
-        }, false)
-
-
-      } else {
-
-        const colorArray = [
-          ['Red and Yellow', function ( freq ) { return new THREE.Color('rgb(255, ' + freq + ', 0)') } ],
-          ['Yellow', function ( freq ) { return new THREE.Color('rgb(' + freq + ', ' + freq + ', 0)') } ],
-          ['Red', function ( freq ) { return new THREE.Color('rgb(' + freq + ', 1, 0)') } ],
-          ['Green', function ( freq ) { return new THREE.Color('rgb(0, ' + freq + ', 0)') } ],
-          ['Blue', function ( freq ) { return new THREE.Color('rgb(0, 0, ' + freq + ')') } ],
-          ['Magenta', function ( freq ) { return new THREE.Color('rgb(' + freq + ', 1, ' + freq + ')') } ]
-        ]
-
-        let selectedColors = false
-        var calculateColor
-
-        colorArray.forEach( ( element ) => {
-
-          if ( remote.getGlobal( 'config' ).colors == element[0] ) {
-            selectedColors = true
-            calculateColor = element[1]
-          } else { selectedColors = false }
-
-          menu.append( new MenuItem( {
-            label: element[0],
-            type: 'radio',
-            checked: selectedColors,
-            click( event ) {
-              remote.getGlobal( 'config' ).colors = element[0]
-              calculateColor = element[1]
-            }
-          }))
-
-        })
-
-        window.addEventListener( 'contextmenu', (event) => {
-          event.preventDefault()
-          if ( visuals ) { menu.popup( remote.getCurrentWindow() ) }
-        }, false)
-
-      }
 
       //---------------------------------------------------------
 
       function init() {
 
-      	container = document.createElement( 'div' )
+      	let container = document.createElement( 'div' )
       	document.body.appendChild( container )
 
       	camera = new THREE.PerspectiveCamera( 70, window.innerWidth / window.innerHeight, 1, 10000 )
-      	camera.position.set( 0, 0, 35 )
-
+        camera.position.set( 0, 0, zCam )
         camera.lookAt( new THREE.Vector3( 0, 0, 0 ) )
 
         //---------------------------------------------------------
 
       	scene = new THREE.Scene()
-        spriteGroup = new THREE.Object3D()
-        scene.add( spriteGroup )
-
-        //---------------------------------------------------------
 
       	raycaster = new THREE.Raycaster()
       	mouse = new THREE.Vector2()
@@ -290,61 +170,180 @@
       	renderer.setSize( window.innerWidth, window.innerHeight )
       	container.appendChild( renderer.domElement )
 
-      }
+        //---------------------------------------------------------
 
-      //---------------------------------------------------------
+        let items
 
-      function addSprite( name, type, number, x, y, z ) {
+        if ( remote.getGlobal( 'config' ).musicPath != '' ) {
 
-        let canvas = document.createElement( 'canvas' )
-        let context = canvas.getContext( '2d' )
-        let metrics = context.measureText( name )
+          try {
 
-        context.strokeStyle = 'rgba( 1, 95, 95, 1 )'
-        context.fillStyle = 'rgba( 1, 95, 95, .4 )'
-        roundRect( context, 0, 5, 300, 80, 20 )
-        context.font = '20px Helvetica'
-        context.fillStyle = 'rgba( 255, 255, 255, 0.95 )'
+            items = fs.readdirSync( remote.getGlobal( 'config' ).musicPath )
 
-        if ( metrics.width < 150 ) {
-          context.fillText( name, 150 - metrics.width, 50 )
-        } else {
-          context.fillText( name, 0, 50 )
+          } catch ( err ) {
+
+      			console.log( err )
+      			remote.getGlobal( 'config' ).musicPath = path.resolve( remote.getGlobal( 'config' ).musicPath, '..')
+      			remote.getCurrentWindow().reload()
+
+          }
+
+          if ( items ) {
+
+            items.forEach( ( item ) => {
+
+      			  try {
+        			    let stats = fs.statSync( path.format( { dir: remote.getGlobal( 'config' ).musicPath, base: item } ) )
+      			    if ( stats.isDirectory() && item.charAt( 0 ) != '.' ) {
+      		 		    dir.push( { name: item, type: 'Directory' } )
+      			    } else if ( item.slice( -3 ) == 'mp3' ) {
+      			  	  mp3.push( { name: item.slice( 0, -4 ), type: 'mp3' } )
+      			    }
+    		      } catch (err) {
+    			      console.log( err )
+      			  }
+
+            })
+
+            elements = dir.concat( mp3 ),
+            elementsLength = elements.length,
+            cubeSide =  Math.floor( Math.cbrt( elementsLength ) )
+
+            if ( mp3.length > 0 ) {
+
+              if ( remote.getGlobal( 'config' ).shuffle == true ) {
+
+                current = dir.length + Math.floor( Math.random() * mp3.length )
+
+                setSource()
+
+              } else {
+
+                current = dir.length
+
+                setSource()
+
+              }
+
+            }
+
+          }
+
+          if ( remote.getGlobal( 'config' ).shuffle == true ) {
+
+            pShuffle.className = ''
+            pShuffle.className = 'button sequential'
+            pShuffle.title = 'Sequential Play'
+
+          }
+
         }
 
-        let texture = new THREE.Texture( canvas )
-        texture.needsUpdate = true
-        texture.minFilter = THREE.LinearFilter
-      	let spriteMaterial = new THREE.SpriteMaterial(
-      		{ map: texture } )
-      	let sprite = new THREE.Sprite( spriteMaterial )
+        if ( elementsLength < 100 ) {
+          spacingHeight = 20
+        } else if ( elementsLength < 1000 ) {
+          spacingHeight = 30
+        } else {
+          spacingHeight = 40
+        }
 
-        sprite.position.set( x, y, z )
-      	sprite.scale.set( 25, 20, 1.0 )
-        sprite.number = number
-        sprite.type = type
-      	spriteGroup.add( sprite )
-        sprites.push( sprite )
+        //---------------------------------------------------------
 
-      }
+        instructions.style.visibility = 'hidden'
 
-      //---------------------------------------------------------
+        if ( remote.getGlobal( 'config' ).musicPath == '' ) {
 
-      function roundRect( context, x, y, w, h, r ) {
+          toggleInstructions()
 
-        context.beginPath()
-        context.moveTo( x + r, y )
-        context.lineTo( x + w - r, y)
-        context.quadraticCurveTo( x + w, y, x + w, y + r )
-        context.lineTo( x + w, y + h - r )
-        context.quadraticCurveTo( x + w, y + h, x + w - r, y + h )
-        context.lineTo( x + r, y + h )
-        context.quadraticCurveTo( x, y + h, x, y + h - r )
-        context.lineTo( x, y + r )
-        context.quadraticCurveTo( x, y, x + r, y )
-        context.closePath()
-        context.fill()
-        context.stroke()
+        } else {
+
+          spriteGroup = new THREE.Object3D()
+          scene.add( spriteGroup )
+
+          for ( let i = 0; i < elementsLength; i ++ ) {
+
+            addSprite( elements[ i ].name, i )
+
+          }
+
+          cubeLayout( spriteGroup, sprites )
+
+          document.addEventListener( 'mousedown', onDocumentMouseDown, false )
+          document.addEventListener( 'mouseup', onDocumentMouseUp, false )
+          document.addEventListener( 'wheel', onDocumentWheel, { passive: true } )
+          document.addEventListener( 'mousemove', onDocumentMouseMove, false )
+
+        }
+
+        document.addEventListener( 'keydown', onKeyDown, false )
+        window.addEventListener( 'resize', onWindowResize, false )
+
+        audioplayer.addEventListener( 'mouseover', () => { overPlayer = true }, false)
+        audioplayer.addEventListener( 'mouseout', () => { overPlayer = false }, false)
+        player.addEventListener( 'ended', playForward, false )
+        player.addEventListener( 'timeupdate', timeUpdate, false )
+        player.addEventListener( 'canplaythrough', () => { duration = player.duration }, false )
+        timeline.addEventListener( 'mouseover', () => { overTimeline = true }, false)
+        timeline.addEventListener( 'mouseout', () => { overTimeline = false }, false)
+
+        let context = new AudioContext(),
+            audioSrc = context.createMediaElementSource( player )
+        analyser = context.createAnalyser()
+        audioSrc.connect( analyser )
+        audioSrc.connect( context                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   .destination )
+        frequencyData = new Uint8Array( analyser.frequencyBinCount )
+        analyser.getByteFrequencyData( frequencyData )
+
+        //---------------------------------------------------------
+
+        menu.append( new MenuItem( {
+          label: 'Select Music Folder',
+          click( event ) {
+            let dir = dialog.showOpenDialog( BrowserWindow.getFocusedWindow(), { properties: ['openDirectory'] } )
+            if ( dir != undefined ) {
+              remote.getGlobal( 'config' ).musicPath = dir[0]
+              remote.getCurrentWindow().reload()
+            }
+          }
+        }))
+
+        menu.append( new MenuItem( {
+          label: 'Instructions',
+          click( event ) {
+              toggleInstructions()
+          }
+        }))
+
+        menu.append( new MenuItem( {
+          label: 'Quit',
+          click( event ) {
+              remote.getCurrentWindow().close()
+          }
+        }))
+
+        window.addEventListener( 'contextmenu', (event) => {
+          event.preventDefault()
+          menu.popup( remote.getCurrentWindow() )
+        }, false)
+
+        //---------------------------------------------------------
+
+        cubeGroup = new THREE.Object3D()
+        scene.add( cubeGroup )
+        cubeGroup.visible = false
+
+        let geometry = new THREE.CubeGeometry( 20, 20, 20 )
+
+        for ( let i = 0; i < 729; i ++ ) {
+
+          let object = new THREE.Mesh( geometry, new THREE.MeshBasicMaterial( { transparent: true, opacity: 0.9 } ) )
+          cubes.push( object )
+          cubeGroup.add( object )
+
+        }
+
+        setLayout ( cubeGroup, cubes, remote.getGlobal( 'config' ).cubeLayout )
+        calculateColor = colorFunctionArray[ remote.getGlobal( 'config' ).cubeColors ]
 
       }
 
@@ -355,352 +354,9 @@
       	camera.aspect = window.innerWidth / window.innerHeight
       	camera.updateProjectionMatrix()
       	renderer.setSize( window.innerWidth, window.innerHeight )
+        remote.getGlobal( 'config' ).x = window.innerWidth
+        remote.getGlobal( 'config' ).y = window.innerHeight
 
-      }
-
-      //--------------------------------------------------------
-
-      function onDocumentMouseDown( event ) {
-
-        pressed = true
-        moved = false
-
-        spriteGroupReference.x = event.clientX
-        spriteGroupReference.y = event.clientY
-
-        if ( overTimeline ) { movePlayhead = true }
-
-      }
-
-      //---------------------------------------------------------
-
-      function onDocumentMouseUp( event ) {
-
-        pressed = false
-
-        if ( !moved && !overPlayer && !visuals ) {
-
-          if ( elements[ selected ].type == 'Parent' ) {
-
-            remote.getGlobal( 'config' ).musicPath = path.resolve( remote.getGlobal( 'config' ).musicPath, '..')
-
-            remote.getCurrentWindow().reload()
-
-          }
-
-          else if ( elements[ selected ].type == 'Directory' ) {
-
-            remote.getGlobal( 'config' ).musicPath = path.resolve( remote.getGlobal( 'config' ).musicPath, elements[ selected ].name )
-
-            remote.getCurrentWindow().reload()
-
-          } else {
-
-            current = selected
-
-            setSource()
-
-            playAudio()
-
-          }
-
-      	}
-
-        if ( movePlayhead ) {
-
-          if ( player. currentTime ) {
-
-            player.currentTime = duration * clickPercent( event )
-
-          }
-
-          movePlayhead  = false
-
-        }
-
-      }
-
-      //---------------------------------------------------------
-
-      function onDocumentMouseMove( event ) {
-
-        clearTimeout( timer )
-        audioplayer.className = 'visible'
-
-        if ( movePlayhead ) {
-
-          var newMargLeft = playHeadPosition( duration * clickPercent( event ) )
-
-          if ( newMargLeft < 0 ) {
-            playhead.style.marginLeft = '0px'
-          } else if ( newMargLeft > ( timeline.offsetWidth - playhead.offsetWidth ) ) {
-            playhead.style.marginLeft = ( timeline.offsetWidth - playhead.offsetWidth )
-          } else {
-            playhead.style.marginLeft = newMargLeft + 'px'
-          }
-
-        } else if ( !overPlayer ) {
-
-          mouse.x = ( event.clientX / renderer.domElement.clientWidth ) * 2 - 1
-        	mouse.y = - ( event.clientY / renderer.domElement.clientHeight ) * 2 + 1
-
-        	raycaster.setFromCamera( mouse, camera )
-
-        	let intersects = raycaster.intersectObjects( sprites )
-
-        	if ( intersects.length > 0 ) {
-
-            for ( let i = 0; i < sprites.length; i ++ ) {
-              if ( intersects[ 0 ].object == sprites[ i ] ) {
-                intersects[ 0 ].object.material.color.set( 0x777777 )
-                selected = intersects[ 0 ].object.number
-              } else {
-                sprites[ i ].material.color.set( 0xffffff )
-              }
-            }
-
-          }
-
-          moved = true
-
-          if ( pressed && !visuals ) {
-
-            spriteGroup.position.x -= spriteGroupReference.x - event.clientX
-            spriteGroup.position.y += spriteGroupReference.y - event.clientY
-
-            spriteGroupReference.x = event.clientX
-            spriteGroupReference.y = event.clientY
-
-            if ( spriteGroup.position.y < 0 ) {
-              spriteGroup.position.y = 0
-            } else if ( spriteGroup.position.y > side * spacingHeight ) {
-              spriteGroup.position.y = side * spacingHeight
-            }
-
-            if ( spriteGroup.position.x > 0 ) {
-              spriteGroup.position.x = 0
-            } else if ( spriteGroup.position.x < - side * spacingWidth ) {
-              spriteGroup.position.x = - side * spacingWidth
-            }
-
-          }
-
-          timer = setTimeout( hidePlayer, 3000 )
-
-        }
-
-      }
-
-      //---------------------------------------------------------
-
-      function onDocumentWheel( event ) {
-
-        if ( event.deltaY < 0 && spriteGroup.position.z < - sprites[ sprites.length - 1 ].position.z ) {
-          spriteGroup.position.z += spacingDepth
-        } else if ( spriteGroup.position.z > 0 ) {
-          spriteGroup.position.z -= spacingDepth
-        }
-
-      }
-
-      //---------------------------------------------------------
-
-      function hidePlayer() {
-
-        audioplayer.className = 'hidden'
-
-      }
-
-      //---------------------------------------------------------
-
-      function playBack() {
-
-        if ( current > dir.length ) { current -- }
-        else { current = elementsLength - 1 }
-
-        setSource()
-
-        playAudio()
-
-      }
-
-      //---------------------------------------------------------
-
-      function playForward() {
-
-        if ( remote.getGlobal( 'config' ).shuffle == true ) {
-
-          current = dir.length + Math.floor( Math.random() * mp3.length )
-
-        } else {
-
-          if ( current < elementsLength - 1 ) { current ++ }
-          else { current = dir.length }
-
-        }
-
-        setSource()
-
-        playAudio()
-
-      }
-
-      //---------------------------------------------------------
-
-      function playAudio() {
-
-        if ( player.paused ) {
-      		player.play()
-      		pPlay.className = ''
-      		pPlay.className = 'button pause'
-          pPlay.title = 'Pause'
-      	} else {
-      		player.pause()
-      		pPlay.className = ''
-      		pPlay.className = 'button play'
-          pPlay.title = 'Play'
-      	}
-
-      }
-
-      //---------------------------------------------------------
-
-      function playShuffle() {
-
-      	if ( remote.getGlobal( 'config' ).shuffle == true ) {
-          remote.getGlobal( 'config' ).shuffle = false
-      		pShuffle.className = ''
-      		pShuffle.className = 'button shuffle'
-          pShuffle.title = 'Shuffle'
-      	} else {
-          remote.getGlobal( 'config' ).shuffle  = true
-      		pShuffle.className = ''
-      		pShuffle.className = 'button sequential'
-          pShuffle.title = 'Sequential Play'
-      	}
-
-      }
-
-      //---------------------------------------------------------
-
-      function timeUpdate() {
-
-        if ( !movePlayhead ) {
-          playhead.style.marginLeft = playHeadPosition( player.currentTime ) + 'px'
-        }
-
-      }
-
-      //---------------------------------------------------------
-
-      function playHeadPosition( location ) {
-
-      	return ( timeline.offsetWidth - playhead.offsetWidth ) * location / duration
-
-      }
-
-      //---------------------------------------------------------
-
-      function clickPercent( event ) {
-
-      	return ( event.pageX - timeline.getClientRects()[0].left - .5 ) / timeline.offsetWidth
-
-      }
-
-      //---------------------------------------------------------
-
-      function setSource() {
-
-        player.src = path.format( {
-          dir: remote.getGlobal( 'config' ).musicPath,
-          base: elements[ current ].name + '.mp3'
-        } )
-
-      }
-
-      //---------------------------------------------------------
-
-      function fullScreen() {
-
-        if ( fullscreen ) {
-
-          BrowserWindow.getFocusedWindow().setFullScreen( false )
-          fullscreen = false
-          pFullScreen.title = 'Fullscreen'
-
-        } else {
-
-          BrowserWindow.getFocusedWindow().setFullScreen( true )
-          fullscreen = true
-          pFullScreen.title = 'Normal'
-
-        }
-
-      }
-
-      //---------------------------------------------------------
-
-      function renderVisuals() {
-
-        if ( visuals ) {
-
-          pVisuals.title = 'Visuals'
-          visuals = false
-          spriteGroup.visible = true
-          objectGroup.visible = false
-          camera.position.set( 0, 0, 25 )
-          camera.lookAt( new THREE.Vector3( 0, 0, 0 ) )
-          spriteGroup.position.set( 0, 0, 0 )
-
-        } else {
-
-          pVisuals.title = 'Files'
-          visuals = true
-          spriteGroup.visible = false
-          camera.position.set( 0, 300, 25 )
-          camera.lookAt( new THREE.Vector3( 0, 0, 1000 ) )
-
-          if ( rendered ) {
-
-            objectGroup.visible = true
-
-          } else {
-
-            rendered = true
-            objectGroup = new THREE.Object3D()
-            scene.add( objectGroup )
-
-            camera.position.set( 0, 300, 25 )
-            camera.lookAt( new THREE.Vector3( 0, 0, 1000 ) )
-
-            let geometry = new THREE.CubeGeometry( 200, 200, 200 )
-
-            for ( let iz = 0; iz < 20; iz ++ ) {
-              for ( let ix = -10; ix < 10; ix ++ ) {
-
-                // let object = new THREE.Mesh( geometry, new THREE.MeshPhongMaterial( { specular: 0x555555, shininess: 30, transparent: true, opacity: 0.5 } ) )
-                let object = new THREE.Mesh( geometry, new THREE.MeshBasicMaterial( { transparent: true, opacity: 0.9 } ) )
-
-                object.position.x = ix * 300
-                object.position.y = 0
-                object.position.z = iz * 300
-
-                objects.push( object )
-                objectGroup.add( object )
-
-              }
-            }
-                //
-                // let light = new THREE.DirectionalLight( 0xffffff )
-                // light.position.set( 0, 1, 1 ).normalize()
-                // scene.add(light)
-                //
-                // let light = new THREE.DirectionalLight( 0xffffff )
-                // light.position.set( 0, 1, -1000 ).normalize()
-                // scene.add(light)
-
-          }
-        }
       }
 
       //---------------------------------------------------------
@@ -712,6 +368,7 @@
         if ( visuals ) {
 
           cycleFrequencyData()
+
         }
 
       	renderer.render( scene, camera )
@@ -724,9 +381,9 @@
 
         analyser.getByteFrequencyData(frequencyData)
 
-        for ( let i = 0; i < objects.length; i ++ ) {
+        for ( let i = 0; i < cubes.length; i ++ ) {
 
-          objects[ i ].material.color = calculateColor( frequencyData[ i ] )
+          cubes[ i ].material.color = calculateColor( frequencyData[ i ] )
 
         }
 

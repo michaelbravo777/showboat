@@ -1,10 +1,9 @@
-const electron = require('electron')
+const electron = require( 'electron' )
 
 const app = electron.app
 const Menu = electron.Menu
 const dialog = electron.dialog
 const BrowserWindow = electron.BrowserWindow
-const nativeImage = electron.nativeImage
 // const Tray = electron.Tray
 
 const path = require('path')
@@ -12,20 +11,24 @@ const url = require('url')
 const fs = require( 'fs' )
 const configFilePath = 'showboat.config'
 
-if ( fs.existsSync( path.resolve(app.getAppPath(), configFilePath) ) ) {
+if ( fs.existsSync( path.resolve( app.getAppPath(), configFilePath ) ) ) {
   try {
-    var configString = fs.readFileSync( path.resolve(app.getAppPath(), configFilePath), 'utf8' )
+    var configString = fs.readFileSync( path.resolve( app.getAppPath(), configFilePath ), 'utf8' )
   } catch ( err ) {
-    console.log( 'error reading config file' )
+    console.log( err )
   }
   global.config = JSON.parse( configString )
 } else {
-  global.config = { musicPath: '', shuffle: 'false', colors: 'Red and Yellow' }
+  global.config = {
+    musicPath: '',
+    shuffle: 'false',
+    cubeLayout: 0,
+    cubeColors: 0,
+    x: 800,
+    y: 600,
+    fullscreen: 'false'
+  }
 }
-
-const menu = Menu.buildFromTemplate([])
-
-Menu.setApplicationMenu(menu)
 
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.
@@ -34,17 +37,18 @@ let mainWindow
 
 function createWindow () {
   // Create the browser window.
-  mainWindow = new BrowserWindow({
-     width: 800,
-     height: 600,
-     icon: nativeImage.createFromPath(__dirname, 'assets/icons/png/icon.png')})
+  mainWindow = new BrowserWindow( {
+     width: global.config.x,
+     height: global.config.y,
+     icon: path.join( __dirname, 'assets/icons/png/icon.png' )
+   } )
 
-  mainWindow.maximize()
-  // mainWindow.setFullScreen(true)
+  // mainWindow.maximize()
+  if ( global.config.fullscreen == true ) { mainWindow.setFullScreen( true ) }
 
   // and load the index.html of the app.
   mainWindow.loadURL(url.format({
-    pathname: path.join(__dirname, 'index.html'),
+    pathname: path.join( __dirname, 'index.html' ),
     protocol: 'file:',
     slashes: true
   }))
@@ -53,12 +57,12 @@ function createWindow () {
   // mainWindow.webContents.openDevTools()
 
   // Emitted when the window is closed.
-  mainWindow.on('closed', () => {
+  mainWindow.on( 'closed', () => {
     // Dereference the window object, usually you would store windows
     // in an array if your app supports multi windows, this is the time
     // when you should delete the corresponding element.
     fs.writeFileSync(
-      path.resolve(app.getAppPath(), configFilePath),
+      path.resolve( app.getAppPath(), configFilePath ),
       JSON.stringify( global.config ),
       'utf8'
     )
@@ -66,12 +70,24 @@ function createWindow () {
     mainWindow = null
   })
 
-  // appIcon = new Tray('showboat.png')
-  // const contextMenu = Menu.buildFromTemplate([
-  //   {label: 'Item1', type: 'radio'},
-  //   {label: 'Item2', type: 'radio'}
+  // appIcon = new Tray( path.join(__dirname, 'assets/icons/png/icon.png') )
+
+  // const menu = Menu.buildFromTemplate([
+  //   {
+  //     label: 'View',
+  //     submenu: [
+  //       {
+  //         role: 'reload'
+  //       },
+  //       {
+  //         role: 'toggledevtools'
+  //       }
+  //     ]
+  //   }
   // ])
   //
+  // Menu.setApplicationMenu(menu)
+
   // // Make a change to the context menu
   // contextMenu.items[1].checked = false
   //
