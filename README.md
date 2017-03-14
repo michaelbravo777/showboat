@@ -4,7 +4,7 @@
 
 Select your music folder to get started (Right click or press m).
 
-![](/screenshots/Screenshot from 2017-02-12 01-33-34.png?raw=true)
+![]("/../screenshots/Screenshot from 2017-02-12 01-33-34.png?raw=true")
 
 Navigate to a folder or select a song to play.
 
