@@ -2,7 +2,7 @@
 
 ###Downloads https://github.com/michaelbravo777/showboat/tree/master/release-builds
 
-Select your music folder to get started (Right click or control-click on Mac).
+Select your music folder to get started (Right click or press m).
 
 ![](/../screenshots/Screenshot from 2017-02-12 01-33-34.png?raw=true)
 
@@ -14,6 +14,6 @@ Click on visuals.
 
 ![](/../screenshots/Screenshot from 2017-02-12 01-34-19.png?raw=true)
 
-Right click to change colors.
+Press c to change colors.
 
 ![](/../screenshots/Screenshot from 2017-02-12 01-34-31.png?raw=true)
