@@ -17,3 +17,6 @@ Click on visuals.
 Press c to change colors.
 
 ![screenshot from 2017-02-12 01-34-31](https://cloud.githubusercontent.com/assets/13419865/23924398/e5e9f2b6-08e0-11e7-89aa-c7f39ac9dda0.png)
+
+### LICENSE
+MIT
